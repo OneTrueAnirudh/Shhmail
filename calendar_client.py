@@ -6,7 +6,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 # If modifying these SCOPES, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/calendar.events.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def authenticate_calendar():
     creds = None
@@ -17,29 +17,48 @@ def authenticate_calendar():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('calendar_credentials.json', SCOPES)
-            creds = flow.run_local_server(port=51043,access_type='offline')  # Use a different port if needed
+            creds = flow.run_local_server(port=51043, access_type='offline')  # Use a different port if needed
         with open('calendar_token.json', 'w') as token:
             token.write(creds.to_json())
     return creds
 
-def main():
+def create_event(service, title, event_datetime):
+    # Convert user-provided datetime to ISO 8601 format with timezone awareness
+    event_time = datetime.datetime.strptime(event_datetime, "%Y-%m-%d %H:%M").astimezone()
+    event_time_iso = event_time.isoformat()
+
+    # Define event details
+    event = {
+        'summary': title,
+        'start': {'dateTime': event_time_iso, 'timeZone': 'UTC'},
+        'end': {'dateTime': (event_time + datetime.timedelta(hours=1)).isoformat(), 'timeZone': 'UTC'},  # Default 1-hour duration
+        'reminders': {
+            'useDefault': False,
+            'overrides': [{'method': 'popup', 'minutes': 12 * 60}],  # Reminder 12 hours before
+        },
+    }
+
+    # Insert event into primary calendar
+    created_event = service.events().insert(calendarId='primary', body=event).execute()
+
+    # Print confirmation message
+    print(f"Event '{title}' scheduled for {event_datetime}. Reminder set 12 hours prior!")
+
+def add_event(event_datetime,title):
     creds = authenticate_calendar()
     service = build('calendar', 'v3', credentials=creds)
-    
-    # Get the current time in UTC
-    now = datetime.datetime.now(datetime.timezone.utc).isoformat()  # Use timezone-aware datetime
-    print('Getting the upcoming 10 events')
-    events_result = service.events().list(
-        calendarId='primary', timeMin=now, maxResults=10, singleEvents=True,
-        orderBy='startTime').execute()
-    events = events_result.get('items', [])
+    create_event(service, title, event_datetime)
 
-    if not events:
-        print('No upcoming events found.')
-    else:
-        for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            print(start, event['summary'])
+def validate_and_add_event(deadline, title, service):
+    """
+    Validates the deadline format and creates a calendar event if valid.
+    """
+    try:
+        # Ensure the deadline matches the expected format
+        event_time = datetime.datetime.strptime(deadline, "%Y-%m-%d %H:%M")
+        # Call create_event if deadline is valid
+        add_event(deadline, title)
+    except ValueError:
+        print(f"[ERROR] Invalid deadline format: {deadline}. Skipping event creation for title: {title}.")
 
-if __name__ == '__main__':
-    main()
+#add_event('test-2','2024-11-21 10:30') # datetime in 'yyyy-mm-dd hh:mm' format
