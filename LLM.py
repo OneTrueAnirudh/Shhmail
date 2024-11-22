@@ -44,7 +44,6 @@ def extract_deadlines(emails):
         "Additionally, provide a short title for a google calendar event based on the email."
         "Your response should contain only the deadline and title, and should be in the format:"
         "yyyy-mm-dd hh:mm event_title_1"
-        "yyyy-mm-dd hh:mm event_title_2"
         "and so on for further mails (deadline separated from title by space, newline for each mail)"
         "If no deadline exists, respond with 'None'"
         "Here are the emails:\n\n{text}"
